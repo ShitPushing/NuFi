@@ -2,13 +2,14 @@
 
 ## 1. Executive Summary & Vision
 
-**Smart Health Companion (branded as NuFi)** is a production-grade, AI-first personal health and nutrition tracking mobile ecosystem. Built with React Native and Node.js/Express, the platform removes the friction of manual dietary logging and unites fragmented wellness data into a unified, actionable companion.
+**Smart Health Companion (branded as NuFi)** is a production-grade, AI-first personal health, nutrition, and clinical companion mobile ecosystem. Built with React Native and Node.js/Express, the platform bridges the gap between manual dietary logging, biometric telemetry, autonomous AI coaching, and clinical doctor consultations.
 
-The platform combines four key pillars:
-1. **Multimodal AI Food Vision**: Direct photo analysis using Google Gemini Vision to recognize meals, calculate calories, macros (protein, carbs, fat), micros (fiber, sugar, sodium), identify ingredients, and compute standardized **Nutri-Scores (A–E)**.
-2. **NuFi Autonomous Health Agent**: An intelligent chat companion powered by Google Gemini and **Mastra Tool Calling**. Users can converse naturally, log meals directly through conversation, inquire about remaining calories/macros, and get health guidance based on live biological metrics.
-3. **Android Health Connect & Google Fit Integration**: Native synchronization with Android Health Connect across 18 read-only health metrics (steps, active calories burned, resting heart rate, sleep duration, distance, etc.), with deduplicated native aggregations and end-to-end encrypted cloud backup.
-4. **Scientific Biometric Target Engine**: Automated computation of Basal Metabolic Rate (BMR) and Total Daily Energy Expenditure (TDEE) via the **Mifflin-St Jeor formula**, coupled with a dynamic **Daily Health Score (0–100)** and weekly adherence tracking.
+The platform combines five foundational pillars:
+1. **Multimodal AI Food Vision**: Instant meal recognition using Google Gemini Vision (`gemini-3.5-flash-lite` / `gemini-3.6-flash`) to estimate calories, macronutrients (protein, carbs, fat), micronutrients (fiber, sugar, sodium), identify ingredients, and compute standardized **Nutri-Scores (A–E)**.
+2. **NuFi Autonomous Health Agent**: An intelligent conversational companion powered by Google Gemini / Groq Llama 3.3 70B and **Mastra Tool Calling**. Users can converse naturally, log meals directly from chat, query remaining macro budgets, and receive personalized feedback based on live biometrics.
+3. **Android Health Connect & Google Fit Integration**: Direct synchronization with Android Health Connect across 18 read-only health metrics (steps, active calories burned, resting heart rate, sleep duration, distance, etc.), with deduplicated native aggregations and end-to-end encrypted cloud backup.
+4. **Scientific Biometric Target Engine**: Automated computation of Basal Metabolic Rate (BMR) and Total Daily Energy Expenditure (TDEE) via the **Mifflin-St Jeor formula**, coupled with a dynamic **Daily Health Score (0–100)** and rolling weekly adherence analytics.
+5. **Clinical Specialist Directory & Appointment Booking**: A curated doctor browsing and dynamic appointment scheduling system built with offline-first resilience for seamless access during network dropouts.
 
 ---
 
@@ -43,7 +44,8 @@ The platform combines four key pillars:
 │         └──────────────────┼─────────────────────────────────┴───────────────────┘       │
 │                            ▼                                                             │
 │       Axios API Client (Token Interceptor, Auto-Timeout, Dual-Endpoint Fallback)         │
-└────────────────────────────┬─────────────────────────────────┬───────────────────────────┘
+│                            │                                 │                           │
+└────────────────────────────┼─────────────────────────────────┼───────────────────────────┘
                              │                                 │
                              ▼                                 ▼
               ┌───────────────────────────────┐ ┌──────────────────────────────────────────┐
@@ -51,18 +53,20 @@ The platform combines four key pillars:
               │                               │ │  - Steps (Daily Native Aggregation)      │
               │  /api/auth/*     (JWT & User) │ │  - Active & Total Calories Burned        │
               │  /api/diet/*     (Meals/Logs) │ │  - Heart Rate & Resting BPM              │
-              │  /api/v1/chat    (Mastra AI)  │ │  - Sleep Sessions & Duration             │
+              │  /api/chat       (Mastra AI)  │ │  - Sleep Sessions & Duration             │
               │  /api/v1/health-connect (Enc) │ │  - 18 Read-Only Metrics (Zero Background)│
-              └──────────────┬────────────────┘ └──────────────────────────────────────────┘
+              │  /api/doctors    (Appointments)│└──────────────────────────────────────────┘
+              └──────────────┬────────────────┘
                              │
          ┌───────────────────┼───────────────────┐
          ▼                   ▼                   ▼
 ┌──────────────────┐┌──────────────────┐┌──────────────────────────────────────────────────┐
 │  MongoDB Atlas   ││  Gemini Vision   ││           Mastra AI Tools Engine                 │
-│  - Users         ││  (3.5/3.6 Flash) ││  - getDietDashboard(today totals vs targets)     │
-│  - MealLogs      │└──────────────────┘│  - logMealFromChat(natural language meal log)    │
-│  - HealthSnapshots│                   │  - getHealthConnectSummary(steps/calories/sleep) │
-│    (AES-256-GCM) │                    │  - getMealHistory(past dates inspection)         │
+│  - Users         ││  (3.5/3.6 Flash) ││  - logMeal (Natural language meal logging)       │
+│  - MealLogs      │└──────────────────┘│  - getDietDashboard (Daily totals vs targets)   │
+│  - HealthSnapshots│                   │  - getHealthConnectSummary (Steps/Burn/Sleep)    │
+│    (AES-256-GCM) │                    │  - getUserTargets / updateUserTargets            │
+│  - Doctors       │                    │  - getMealHistory (Historical date inspection)   │
 └──────────────────┘                    └──────────────────────────────────────────────────┘
 ```
 
@@ -72,33 +76,35 @@ The platform combines four key pillars:
 
 ### 3.1. Multimodal AI Food Vision Scanner
 - **Files**: `src/screens/FoodScannerScreen.jsx`, `server/services/aiService.js`, `src/screens/MealNutritionDetailScreen.jsx`
-- **Capture**: Users can capture a live photo via camera or pick an image from their gallery using `react-native-image-picker` with optimized image compression (JPEG, 0.8 quality, max 1024x1024).
-- **Vision Inference**: Sends base64 image data to `POST /api/diet/scan`. The backend utilizes Google Gemini Vision (`gemini-3.5-flash-lite` with fallback to `gemini-3.6-flash`).
+- **Image Acquisition**: Users can snap a live photo or pick from their gallery via `react-native-image-picker` with optimized compression (JPEG, 0.8 quality, 1024x1024 max dimensions).
+- **Vision Inference**: Sends clean base64 data to `POST /api/diet/scan`. The backend utilizes Google Gemini Vision (`gemini-3.5-flash-lite` with fallback to `gemini-3.6-flash`).
 - **Safety Guardrail**: Detects non-food objects. If a user scans a pet, keyboard, or vehicle, the prompt instructs Gemini to flag `isFood: false`, prompting the user to photograph an edible item.
 - **Nutri-Score Computation**: Automatically classifies meal quality from **A** (healthiest) down to **E** based on nutrient density, fiber, protein vs. sodium and sugar levels.
-- **Review & Confirm**: Navigates to `MealNutritionDetailScreen` where users can inspect detected ingredients, tweak portion sizes or macro counts, and save to their daily log.
+- **Review & Confirm**: Navigates to `MealNutritionDetailScreen` where users inspect detected ingredients, tweak portion sizes or macros, and save to their daily log.
 
 ### 3.2. NuFi Autonomous AI Coach & Mastra Tool Calling
 - **Files**: `src/screens/NuFiAIScreen.jsx`, `server/routes/chatRoute.js`, `server/tools/mastraNutritionTools.js`
-- **Conversational Meal Logging**: Users can type natural phrases like *"I ate 2 boiled eggs and a cup of black coffee for breakfast"*. The AI agent calls `logMealFromChat`, generates exact nutritional estimates, saves the meal to MongoDB, and responds with confirmation and remaining macro balances.
+- **Conversational Meal Logging**: Users can type natural phrases like *"I ate 2 boiled eggs and a cup of black coffee for breakfast"*. The AI agent executes `logMeal`, estimates accurate portion calories and macros, writes to MongoDB, and returns confirmation with updated score and remaining budget.
 - **Mastra Function Calling Loop**:
   - `getDietDashboard`: Retrieves today's consumed calories, remaining calories, macronutrients, and logged meals.
   - `getHealthConnectSummary`: Retrieves today's live steps, active calories burned, sleep duration, and resting heart rate.
   - `getMealHistory`: Fetches historical dietary logs for any specific date.
-  - `logMealFromChat`: Creates authenticated `MealLog` records with Nutri-Scores directly during the conversation.
-- **Deterministic Animated Keyboard UI**: Uses a pure React Native `Animated.Value` spacer (`keyboardSpacerAnim`) with zero `KeyboardAvoidingView` conflicts.
-  - **Resting**: Rests cleanly at `Math.max(insets.bottom, 8) + 68 + 12px` above the floating navigation pill.
-  - **Open**: Expands smoothly by `keyboardHeight + insets.bottom + 40px`, comfortably clearing the keyboard, IME predictive toolbar, and system navigation bar on Android.
-  - **Close / Back Button**: Smoothly animates down to the resting position without lingering in mid-air.
-- **Session Persistence**: Stores multiple past chat threads in `AsyncStorage` with custom titles, creation dates, message counts, and drawer navigation.
+  - `getUserTargets` & `updateUserTargets`: Inspects and updates physical targets dynamically.
+  - `getWeeklyProgress`: Evaluates 7-day adherence trends.
+  - `logMeal`: Directly commits verified meal entries into the database during dialogue.
+- **Deterministic Animated Keyboard UI**: Uses a pure React Native `Animated.Value` spacer (`keyboardSpacerAnim`) with zero `KeyboardAvoidingView` conflicts:
+  - **Resting**: Positioned at `Math.max(insets.bottom, 8) + 68 + 12px` above the floating navigation pill.
+  - **Open**: Expands smoothly by `keyboardHeight + insets.bottom + 40px`, comfortably clearing the Android soft keyboard, predictive toolbar, and system navigation bar.
+  - **Close / Back Button**: Smoothly returns to resting height without lingering.
+- **Session Persistence**: Stores past chat threads in `AsyncStorage` with custom titles, creation dates, message counts, and drawer navigation.
 
 ### 3.3. Android Health Connect & Google Fit Sync
 - **Files**: `src/services/healthConnectService.js`, `src/context/HealthConnectContext.jsx`, `server/models/HealthConnectSnapshot.js`, `server/utils/crypto.js`
-- **18 Read-Only Metrics**: Reads Steps, Heart Rate, Resting Heart Rate, Active Calories, Total Calories, BMR, Distance, Floors Climbed, Sleep Sessions, Blood Pressure, Blood Glucose, Oxygen Saturation, Respiratory Rate, VO2 Max, HRV Rmssd, Hydration, Body Fat, and Exercise Sessions.
+- **18 Read-Only Metrics**: Steps, Heart Rate, Resting Heart Rate, Active Calories, Total Calories, BMR, Distance, Floors Climbed, Sleep Sessions, Blood Pressure, Blood Glucose, Oxygen Saturation, Respiratory Rate, VO2 Max, HRV Rmssd, Hydration, Body Fat, and Exercise Sessions.
 - **Native Aggregation**: Calls `HealthConnect.aggregateRecord` for `Steps` to extract Google Fit's official deduplicated step count (`COUNT_TOTAL`), preventing double-counting between multiple source apps (e.g. phone sensors vs. smartwatches).
 - **Time Window Precision**:
-  - Uses device-local midnight (`setHours(0,0,0,0)`) rather than UTC midnight to avoid dropping steps walked in non-UTC timezones (e.g., IST morning walks).
-  - Uses `operator: 'after'` for 30-day reads, today's step aggregation, and sleep queries. This avoids Android's strict `TimeRangeFilter.between()` validation bug (`startTime must be before endTime`).
+  - Uses device-local midnight (`setHours(0,0,0,0)`) rather than UTC midnight to avoid dropping steps walked in non-UTC timezones.
+  - Uses `operator: 'after'` for 30-day reads, today's step aggregation, and sleep queries, completely eliminating the Android SDK `startTime must be before endTime` exception.
 - **Encrypted Cloud Sync**: Snapshots are synced to `PUT /api/v1/health-connect` and stored in MongoDB using **AES-256-GCM** encryption with authenticated tags and initialization vectors (IVs).
 - **Infinite Loop Prevention**: Throttled on focus with a 60-second cooldown and stabilized via `useRef` to maintain constant callback identity.
 
@@ -131,9 +137,47 @@ The platform combines four key pillars:
   - Muscle Gain: $\text{TDEE} + 400\text{ kcal}$
 - **Macro Distribution**: Automatically derives 30% Protein, 45% Carbohydrates, and 25% Fat.
 
+### 3.6. Specialist Directory & Doctor Appointment Booking
+- **Files**: `server/models/Doctor.js`, `server/index.js`, `src/screens/DoctorScreen.jsx`
+- **Specialist Profiles**: Clinical doctor listings categorized by specialty, experience, verified patient ratings, and clinic availability hours.
+- **Dynamic Scheduling**: Interactive day and slot picker strictly constrained to doctor clinic hours.
+- **Offline-First Resilience**: Intercepts network interruptions by falling back to cached specialist listings in local device storage.
+
 ---
 
-## 4. Technology Stack & Libraries
+## 4. Mastra AI Tools Engine Specification
+
+NuFi equips the AI Agent with 9 domain tools defined in `server/tools/mastraNutritionTools.js`:
+
+| Tool Name | Parameters | Purpose & Description |
+| :--- | :--- | :--- |
+| `getDietDashboard` | *(none)* | Returns today's consumed calories, macros, target goals, remaining budget, and logged meals. |
+| `getTodaySummary` | *(none)* | Compact summary of today's nutrition and calorie score for quick conversational check-ins. |
+| `getMealHistory` | `date` (YYYY-MM-DD) | Retrieves full meal breakdown and macronutrients for any requested historical date. |
+| `getUserTargets` | *(none)* | Fetches the user's active BMR, TDEE, calorie target, and macro goals. |
+| `updateUserTargets` | `calories`, `protein`, `carbs`, `fat`, `fiber`, `sugar`, `sodium` | Dynamically updates user nutritional goals based on progress or conversational preferences. |
+| `getWeeklyProgress` | *(none)* | Calculates 7-day adherence metrics, average calories consumed, and weekly score. |
+| `getHealthConnectSummary` | *(none)* | Accesses decrypted Health Connect snapshot to provide live steps, active burn, sleep, and heart rate. |
+| `logMeal` | `name`, `mealType`, `calories`, `protein`, `carbs`, `fat`, `fiber`, `sugar`, `sodium` | Primary tool that persists a new meal record directly to MongoDB during conversation. |
+| `logMealFromChat` | `name`, `mealType`, `calories`, `protein`, `carbs`, `fat`, `fiber`, `sugar`, `sodium` | Alias with automated Nutri-Score calculation for conversational meal confirmation. |
+
+---
+
+## 5. Defense-in-Depth Safety & Guardrails Architecture
+
+NuFi implements safety guardrails across its AI and biometric pipeline:
+
+| Guardrail Layer | Implementation Location | Mechanism & Purpose |
+| :--- | :--- | :--- |
+| **Domain Scope & Off-Topic Guardrail** | `server/routes/chatRoute.js` (`getSystemInstructions`) | Restricts NuFi strictly to nutrition, diet, fitness, and wellness. Rejects programming code (e.g., reversing a string, scripting algorithms), math puzzles, or general non-health topics with a polite redirect back to nutrition. |
+| **Non-Food Vision Guardrail** | `server/services/aiService.js` (`analyzeFoodImage`) | Enforces structured prompt output with `isFood: false` if a user photographs non-edible items (pets, electronics, scenery), preventing erroneous meal logs. |
+| **Biometric Non-Diagnostic Guardrail** | `server/routes/chatRoute.js` (`getSystemInstructions`) | Prohibits AI from prescribing medication or giving clinical diagnoses from sensor readings. Biometrics are treated as wellness telemetry, not clinical diagnoses. |
+| **Explicit Consent Guardrail** | `server/tools/mastraNutritionTools.js` (`getHealthConnectSummary`) | Checks `consentGiven === true` in the encrypted `HealthConnectSnapshot`. If consent is missing or revoked, biometric access is blocked and the user is directed to settings. |
+| **Data Freshness Guardrail** | `server/tools/mastraNutritionTools.js` & `chatRoute.js` | Drops or alerts on biometric records older than 30 days or stale by >24 hours, preventing old metrics from being hallucinated as today's activity. |
+
+---
+
+## 6. Technology Stack & Dependencies
 
 ### Mobile Application (Frontend)
 | Package | Version | Purpose |
@@ -166,7 +210,7 @@ The platform combines four key pillars:
 
 ---
 
-## 5. Database Schema & Models
+## 7. Database Schemas & Models
 
 ### 1. User (`server/models/User.js`)
 ```javascript
@@ -235,9 +279,22 @@ The platform combines four key pillars:
 }
 ```
 
+### 4. Doctor (`server/models/Doctor.js`)
+```javascript
+{
+  name: { type: String, required: true },
+  specialization: { type: String, required: true },
+  rating: { type: Number, default: 4.5 },
+  experienceYears: { type: Number, default: 5 },
+  availableDays: [String],
+  clinicHours: { start: String, end: String },
+  contact: { phone: String, email: String }
+}
+```
+
 ---
 
-## 6. Complete REST API Reference
+## 8. Complete REST API Reference
 
 ### Authentication Routes (`/api/auth`)
 | Method | Endpoint | Description |
@@ -256,10 +313,10 @@ The platform combines four key pillars:
 | `PUT` | `/api/diet/targets` | Updates user physical attributes and recalculates nutrition goals |
 | `PUT` | `/api/diet/habits/toggle` | Toggles status of daily routine habit item |
 
-### NuFi AI Assistant Routes (`/api/v1/chat`)
+### NuFi AI Assistant Routes (`/api/chat`)
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/v1/chat` | AI conversational endpoint with Mastra Tool Calling (natural language queries & meal logging) |
+| `POST` | `/api/chat` | AI conversational endpoint with Mastra Tool Calling (natural language queries & meal logging) |
 
 ### Health Connect Routes (`/api/v1/health-connect`)
 | Method | Endpoint | Description |
@@ -269,9 +326,14 @@ The platform combines four key pillars:
 | `PATCH` | `/api/v1/health-connect` | Updates sync settings (`sync_enabled`, `assistant_access_enabled`) |
 | `DELETE` | `/api/v1/health-connect` | Deletes stored Health Connect snapshot from cloud storage |
 
+### Doctors & Appointments (`/api/doctors`)
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/doctors` | Retrieves specialist directory with ratings, clinic hours, and availability |
+
 ---
 
-## 7. Directory & File Organization
+## 9. Directory & File Organization
 
 ```
 Smart-Health-Companion/
@@ -331,18 +393,20 @@ Smart-Health-Companion/
 │           └── MainActivity.kt     # Permission delegate initialization
 ├── App.tsx                         # Root React Native component with Context Providers
 ├── description.md                  # Comprehensive project architecture documentation
+├── README.md                       # Project overview and setup documentation
 └── package.json                    # Project dependencies and run scripts
 ```
 
 ---
 
-## 8. Setup & Execution Guide
+## 10. Setup & Execution Guide
 
 ### Prerequisites
-- **Node.js**: v20+ recommended
-- **Android Studio**: Android SDK (API 34+ / Android 14+ recommended for native Health Connect)
-- **MongoDB**: MongoDB Atlas URI or local instance (`mongodb://localhost:27017/smarthealth`)
+- **Node.js**: v18+ recommended (tested on v20+)
+- **Android Studio**: Android SDK 34+ (Health Connect native support)
+- **MongoDB**: MongoDB Atlas URI or local instance
 - **Google Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/)
+- **Groq API Key**: (Optional, recommended for ultrafast chat) From [Groq Console](https://console.groq.com/)
 
 ### 1. Backend Configuration
 1. Navigate to `server/`:
@@ -356,9 +420,15 @@ Smart-Health-Companion/
    MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/smarthealth?retryWrites=true&w=majority
    JWT_SECRET=your_jwt_secret_key_here
    GEMINI_API_KEY=your_gemini_api_key_here
+   GROQ_API_KEY=your_groq_api_key_here
    ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+   DEFAULT_TIMEZONE_OFFSET=-330
    ```
-3. Start the server:
+3. *(Optional)* Seed initial doctor directory:
+   ```bash
+   node seed.js
+   ```
+4. Start the server:
    ```bash
    node index.js
    ```
@@ -384,7 +454,7 @@ Smart-Health-Companion/
 
 ---
 
-## 9. Key Engineering Solutions Implemented
+## 11. Key Engineering Solutions Implemented
 
 1. **Android Soft Keyboard Double-Compensation**:
    - Resolved by replacing `KeyboardAvoidingView` with a pure `Animated.Value` spacer.
@@ -401,3 +471,6 @@ Smart-Health-Companion/
 4. **Single Source of Truth for Steps & Active Burn**:
    - Relies exclusively on `HealthConnect.aggregateRecord` for `Steps` to align with Google Fit's official deduplicated counts, avoiding double-counting between multiple device sensors.
    - Synchronized Mastra AI tool `getHealthConnectSummary` to match the dashboard calculation logic.
+
+5. **Strict Domain Scope Guardrail**:
+   - Implemented an explicit guardrail rule in `server/routes/chatRoute.js` (`getSystemInstructions`) instructing the model to reject non-wellness queries (e.g., writing code to reverse a string or software debugging) and politely redirect users back to their nutrition goals.

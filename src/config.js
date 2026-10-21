@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 // export const API_URL = 'http://localhost:3000/api';
 
 // Production API URL hosted on Railway (uncomment once changes are pushed to Railway)
-export const API_URL = 'https://nufi.up.railway.app/api';
+export const API_URL = 'https://nufi-production.up.railway.app/api';
 
 // Configurable Privacy Policy URL
 export const PRIVACY_POLICY_URL = 'https://nufi.up.railway.app/privacy-policy';
